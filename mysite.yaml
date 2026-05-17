@@ -1,0 +1,108 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mysite-deployment
+  namespace: default
+  labels:
+    app: mainsite
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: mainsite
+  template:
+    metadata:
+      annotations:
+        iam.amazonaws.com/role: arn:aws:iam::842805395457:role/Test_ec2ForSDK
+        linkerd.io/inject: enabled
+      labels:
+        app: mainsite
+        name: mysite
+        version: "32406bb"
+    spec:
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: app
+                  operator: In
+                  values: ["mainsite"]
+              topologyKey: kubernetes.io/hostname
+      initContainers:
+      # Pull /mysite/* parameters from AWS SSM into /shared/.env
+      - name: setup
+        image: ghcr.io/anthony-bible/mysite@sha256:8e22604b28e27fb75830e0b62a864c7b71492ac1c5e2108b2f48631d0fcb7b3a
+        command:
+          - sh
+          - -c
+          - |
+            set -eu
+            apt-get update && apt-get install -y --no-install-recommends awscli rsync || \
+              (apk add --no-cache aws-cli rsync 2>/dev/null || true)
+            aws configure set default.region us-west-2
+            aws ssm get-parameters-by-path \
+              --path /mysite/ --recursive --with-decryption \
+              --output text \
+              --query "Parameters[].[Name,Value]" \
+              | sed -E 's#/mysite/([^[:space:]]*)[[:space:]](.*)#export \1="\2"#' \
+              | sed -E 's/(export)([[:space:]].*=)/\1\U\2/' > /shared/.env
+        volumeMounts:
+        - name: env
+          mountPath: /shared
+      containers:
+      - name: mainsite
+        image: ghcr.io/anthony-bible/mysite@sha256:8e22604b28e27fb75830e0b62a864c7b71492ac1c5e2108b2f48631d0fcb7b3a
+        imagePullPolicy: IfNotPresent
+        command: ["sh", "-c", "cp /shared/.env /var/www/html/.env 2>/dev/null || true; apache2-foreground"]
+        ports:
+        - containerPort: 80
+          name: http
+          protocol: TCP
+        volumeMounts:
+        - name: env
+          mountPath: /shared
+        livenessProbe:
+          httpGet:
+            path: /
+            port: 80
+          initialDelaySeconds: 30
+          periodSeconds: 30
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 80
+          initialDelaySeconds: 5
+          periodSeconds: 10
+          timeoutSeconds: 3
+          failureThreshold: 3
+        resources:
+          requests:
+            memory: "64Mi"
+            cpu: "10m"
+          limits:
+            memory: "256Mi"
+            cpu: "500m"
+      volumes:
+      - name: env
+        emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mainsite-service
+  namespace: default
+  annotations:
+    # external-dns.alpha.kubernetes.io/hostname: anthony.bible  # TODO: set hostname
+spec:
+  selector:
+    app: mainsite
+  ports:
+    - name: http
+      port: 80
+      targetPort: 80
+      protocol: TCP
