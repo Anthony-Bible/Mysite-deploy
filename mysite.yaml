@@ -18,7 +18,7 @@ spec:
       labels:
         app: mainsite
         name: mysite
-        version: "fb8e7a6"
+        version: "0e671af"
     spec:
       affinity:
         podAntiAffinity:
@@ -33,15 +33,14 @@ spec:
               topologyKey: kubernetes.io/hostname
       initContainers:
       # Pull /mysite/* parameters from AWS SSM into /shared/.env
+      # (awscli + rsync are baked into the image, no runtime install)
       - name: setup
-        image: ghcr.io/anthony-bible/mysite@sha256:913f612b98232726b6c328d22d80619f70e7b3dabbb9a2d9d32a3b8f84d4ceda
+        image: ghcr.io/anthony-bible/mysite@sha256:5dcbb57f2faaae0591523652903e9e0fa8b105b82b2cb6e44a444c1f3c8d0cab
         command:
           - sh
           - -c
           - |
             set -eu
-            apt-get update && apt-get install -y --no-install-recommends awscli rsync || \
-              (apk add --no-cache aws-cli rsync 2>/dev/null || true)
             aws configure set default.region us-west-2
             aws ssm get-parameters-by-path \
               --path /mysite/ --recursive --with-decryption \
@@ -49,12 +48,19 @@ spec:
               --query "Parameters[].[Name,Value]" \
               | sed -E 's#/mysite/([^[:space:]]*)[[:space:]](.*)#export \1="\2"#' \
               | sed -E 's/(export)([[:space:]].*=)/\1\U\2/' > /shared/.env
+        resources:
+          requests:
+            memory: "64Mi"
+            cpu: "10m"
+          limits:
+            memory: "256Mi"
+            cpu: "500m"
         volumeMounts:
         - name: env
           mountPath: /shared
       containers:
       - name: mainsite
-        image: ghcr.io/anthony-bible/mysite@sha256:913f612b98232726b6c328d22d80619f70e7b3dabbb9a2d9d32a3b8f84d4ceda
+        image: ghcr.io/anthony-bible/mysite@sha256:5dcbb57f2faaae0591523652903e9e0fa8b105b82b2cb6e44a444c1f3c8d0cab
         imagePullPolicy: IfNotPresent
         command: ["sh", "-c", "cp /shared/.env /var/www/html/.env 2>/dev/null || true; apache2-foreground"]
         ports:
