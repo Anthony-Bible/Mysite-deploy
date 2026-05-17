@@ -18,7 +18,7 @@ spec:
       labels:
         app: mainsite
         name: mysite
-        version: "9639b8e"
+        version: "01b38b8"
     spec:
       affinity:
         podAntiAffinity:
@@ -35,7 +35,7 @@ spec:
       # Pull /mysite/* parameters from AWS SSM into /shared/.env
       # (awscli + rsync are baked into the image, no runtime install)
       - name: setup
-        image: ghcr.io/anthony-bible/mysite@sha256:e9035ba1c8e3f3846707a43dfaa990b386fc4fb894fdfa6c1a39989e7d109f1b
+        image: ghcr.io/anthony-bible/mysite@sha256:f80972c53b80673c761e94f15b868f35f97a424937ed50ff82ff0de87c9dc238
         command:
           - sh
           - -c
@@ -60,7 +60,7 @@ spec:
           mountPath: /shared
       containers:
       - name: mainsite
-        image: ghcr.io/anthony-bible/mysite@sha256:e9035ba1c8e3f3846707a43dfaa990b386fc4fb894fdfa6c1a39989e7d109f1b
+        image: ghcr.io/anthony-bible/mysite@sha256:f80972c53b80673c761e94f15b868f35f97a424937ed50ff82ff0de87c9dc238
         imagePullPolicy: IfNotPresent
         command: ["sh", "-c", "cp /shared/.env /var/www/html/.env 2>/dev/null || true; apache2-foreground"]
         envFrom:
