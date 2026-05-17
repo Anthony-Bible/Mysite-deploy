@@ -1,7 +1,7 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: mysite-deployment
+  name: mystaticsite-deployment
   namespace: default
   labels:
     app: mainsite
@@ -18,7 +18,7 @@ spec:
       labels:
         app: mainsite
         name: mysite
-        version: "32406bb"
+        version: "fb8e7a6"
     spec:
       affinity:
         podAntiAffinity:
@@ -34,7 +34,7 @@ spec:
       initContainers:
       # Pull /mysite/* parameters from AWS SSM into /shared/.env
       - name: setup
-        image: ghcr.io/anthony-bible/mysite@sha256:8e22604b28e27fb75830e0b62a864c7b71492ac1c5e2108b2f48631d0fcb7b3a
+        image: ghcr.io/anthony-bible/mysite@sha256:913f612b98232726b6c328d22d80619f70e7b3dabbb9a2d9d32a3b8f84d4ceda
         command:
           - sh
           - -c
@@ -54,7 +54,7 @@ spec:
           mountPath: /shared
       containers:
       - name: mainsite
-        image: ghcr.io/anthony-bible/mysite@sha256:8e22604b28e27fb75830e0b62a864c7b71492ac1c5e2108b2f48631d0fcb7b3a
+        image: ghcr.io/anthony-bible/mysite@sha256:913f612b98232726b6c328d22d80619f70e7b3dabbb9a2d9d32a3b8f84d4ceda
         imagePullPolicy: IfNotPresent
         command: ["sh", "-c", "cp /shared/.env /var/www/html/.env 2>/dev/null || true; apache2-foreground"]
         ports:
